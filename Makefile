@@ -4,24 +4,26 @@
 
 include $(GOROOT)/src/Make.$(GOARCH)
 
+PREREQ+=redisio.a
 TARG=undis
 GOFILES=\
 		rdefs.go \
 		undis.go
 
+
 include $(GOROOT)/src/Make.cmd
 
-tools:
-	${GC} -o redis-dump.${O} redis-dump.go
-	${LD} -o redis-dump redis-dump.${O}
-	install -m 0755 redis-dump $(GOBIN)
-	${GC} -o redis-load.${O} redis-load.go
-	${LD} -o redis-load redis-load.${O}
-	install -m 0755 redis-load $(GOBIN)
-
 format:
-	gofmt -spaces=true -tabindent=false -tabwidth=4 -w *.go
-
+	gofmt -spaces=true -tabindent=false -tabwidth=4 -w $(GOFILES)
 
 rdefs:
 	./genrdefs.sh ~/other/redis | gofmt > rdefs.go
+
+redisio.$O: redisio.go
+	$(QUOTED_GOBIN)/$(GC) -o $@ $?
+
+redisio.a: redisio.$O
+	rm -f $@
+	$(QUOTED_GOBIN)/gopack grc $@ $?
+
+

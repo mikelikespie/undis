@@ -7,6 +7,7 @@ import (
 	"os"
 	"bufio"
 	"strconv"
+	"./redisio"
 )
 
 const (
@@ -58,14 +59,12 @@ func parseBulk(reader *bufio.Reader) []byte {
 	b, err := reader.ReadByte()
 	if b != '$' || err != nil {
 		fmt.Fprintf(os.Stderr, "Format not expected: %v\n", err)
-		panic("oh no")
 		return nil
 	}
 
 	line, err := reader.ReadString('\n')
 	if err != nil || line[len(line)-2] != '\r' {
 		fmt.Fprintf(os.Stderr, "Format not expected: %v\n", err)
-		panic("oh no")
 		return nil
 	}
 
@@ -74,7 +73,6 @@ func parseBulk(reader *bufio.Reader) []byte {
 	numBytes, err := strconv.Atoi(line)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Format not expected: %v\n", err)
-		panic("oh no")
 		return nil
 	}
 
@@ -84,7 +82,6 @@ func parseBulk(reader *bufio.Reader) []byte {
 
 	if nn != len(buff) || err != nil {
 		fmt.Fprintf(os.Stderr, "Format not expected: %v\n", err)
-		panic("oh no")
 		return nil
 	}
 
@@ -102,31 +99,26 @@ func parseMulti(reader *bufio.Reader) (string, [][]byte) {
 	line, err := reader.ReadString('\n')
 
 	if err != nil || line[len(line)-2] != '\r' {
-		panic("oh no")
 		fmt.Fprintf(os.Stderr, "Format not expected: %v\n", err)
 		return "", nil
 	}
-
 
 	line = line[0 : len(line)-2] // trim off the \r
 
 
 	numArgs, err := strconv.Atoi(line)
 	if err != nil {
-		panic("oh no")
 		fmt.Fprintf(os.Stderr, "ohFormat not expected: %v\n", err)
 		return "", nil
-	} else if  numArgs < 1 {
-		panic("oh no")
+	} else if numArgs < 1 {
 		fmt.Fprintf(os.Stderr, "bad format thought hwe'd have more than %d args\n", numArgs)
 		return "", nil
 
 	}
 
-	numArgs--; // Subtract one off because we're going to be parsing the cmd Name
+	numArgs-- // Subtract one off because we're going to be parsing the cmd Name
 
 	cmdName := string(parseBulk(reader))
-
 
 	return cmdName, [][]byte{}
 }
@@ -136,7 +128,6 @@ func parseSingle(reader *bufio.Reader) (string, [][]byte) {
 	cmdName, err := reader.ReadString(' ')
 
 	if err != nil {
-		panic("oh no")
 		fmt.Fprintf(os.Stderr, "Format not expected: %v\n", err)
 		return "", nil
 	}
