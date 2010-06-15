@@ -4,7 +4,7 @@
 
 include $(GOROOT)/src/Make.$(GOARCH)
 
-TARG=foo
+TARG=undis
 GOFILES=\
 		rdefs.go \
 		undis.go

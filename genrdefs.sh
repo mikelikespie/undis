@@ -6,7 +6,7 @@ REDIS_C=$REDIS_DIR/redis.c
 
 
 cat <<GOFILE
-package rdefs
+package main
 
 const (
 GOFILE
