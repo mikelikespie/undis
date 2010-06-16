@@ -11,8 +11,8 @@ import (
 )
 
 const (
-    Test = 3
-	LineDelim = "\r\n"
+    Test      = 3
+    LineDelim = "\r\n"
 )
 
 type RedisIOError struct {
@@ -210,39 +210,53 @@ func NewWriter(wr io.Writer) (rr *Writer) {
 
 
 func (rr *Writer) Flush() (err os.Error) {
-	return rr.wr.Flush();
+    return rr.wr.Flush()
 }
 
 
 func (rr *Writer) WriteCommand(cmd *RedisCommand) (err os.Error) {
-	rr.wr.WriteByte('*')
-	nargs := 1 + len(cmd.args) // ARgs  + cmd name
-	_, err = rr.wr.WriteString(strconv.Itoa(nargs))
-	if err != nil { return err }
+    rr.wr.WriteByte('*')
+    nargs := 1 + len(cmd.args) // ARgs  + cmd name
+    _, err = rr.wr.WriteString(strconv.Itoa(nargs))
+    if err != nil {
+        return err
+    }
 
-	_, err = rr.wr.WriteString(LineDelim)
-	if err != nil { return err }
+    _, err = rr.wr.WriteString(LineDelim)
+    if err != nil {
+        return err
+    }
 
-	rr.Flush() //TODO add logic to only flush if there's no data left in buffer
+    rr.Flush() //TODO add logic to only flush if there's no data left in buffer
 
-	return nil
+    return nil
 }
 
 func (rr *Writer) writeBulk(arg []byte) (err os.Error) {
-	err = rr.wr.WriteByte('$')
-	if err != nil { return err }
+    err = rr.wr.WriteByte('$')
+    if err != nil {
+        return err
+    }
 
-	_, err = rr.wr.WriteString(strconv.Itoa(len(arg)))
-	if err != nil { return err }
+    _, err = rr.wr.WriteString(strconv.Itoa(len(arg)))
+    if err != nil {
+        return err
+    }
 
-	_, err = rr.wr.WriteString(LineDelim)
-	if err != nil { return err }
+    _, err = rr.wr.WriteString(LineDelim)
+    if err != nil {
+        return err
+    }
 
-	_, err = rr.wr.Write(arg)
-	if err != nil { return err }
+    _, err = rr.wr.Write(arg)
+    if err != nil {
+        return err
+    }
 
-	_, err = rr.wr.WriteString(LineDelim)
-	if err != nil { return err }
+    _, err = rr.wr.WriteString(LineDelim)
+    if err != nil {
+        return err
+    }
 
-	return nil
+    return nil
 }
