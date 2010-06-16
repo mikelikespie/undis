@@ -7,19 +7,21 @@ include $(GOROOT)/src/Make.$(GOARCH)
 PREREQ+=redisio.a
 TARG=undis
 GOFILES=\
-		rdefs.go \
 		undis.go
 
+REDISIO_FILES=\
+			  redisio.go \
+			  rdefs.go
 
 include $(GOROOT)/src/Make.cmd
 
 format:
-	gofmt -spaces=true -tabindent=false -tabwidth=4 -w $(GOFILES)
+	gofmt -spaces=true -tabindent=false -tabwidth=4 -w $(GOFILES) $(REDISIO_FILES)
 
 rdefs:
 	./genrdefs.sh ~/other/redis | gofmt > rdefs.go
 
-redisio.$O: redisio.go
+redisio.$O: $(REDISIO_FILES)
 	$(QUOTED_GOBIN)/$(GC) -o $@ $?
 
 redisio.a: redisio.$O
