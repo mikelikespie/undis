@@ -12,6 +12,7 @@ import (
 
 const (
     Test = 3
+	LineDelim = "\r\n"
 )
 
 type RedisIOError struct {
@@ -40,7 +41,7 @@ type RedisCommand struct {
 }
 
 func (rc *RedisCommand) String() string {
-    return fmt.Sprintf("RedisCommand(name='%v', args={'%v'})",
+    return fmt.Sprintf("RedisCommand(name='%s', args={'%s'})",
         rc.name, bytes.Join(rc.args, []byte("', '")))
 }
 
@@ -55,6 +56,29 @@ func NewReader(rd io.Reader) *Reader {
     return rr
 }
 
+func (rr *Reader) ReadCommand() (cmd *RedisCommand, err os.Error) {
+    firstChar, err := rr.rd.ReadByte()
+
+    if err != nil {
+        return nil, newError(err, "error reading first char from command")
+    }
+
+    if firstChar == '*' {
+        cmd, err = rr.parseMulti()
+        if err != nil {
+            return nil, newError(err, "parseMulti failed")
+        }
+    } else {
+        rr.rd.UnreadByte() // Gotta unread one byte
+        cmd, err = rr.parseSingle()
+        if err != nil {
+            return nil, newError(err, "parseSingle failed")
+        }
+    }
+
+    fmt.Printf("Got command %v!\n", cmd.name)
+    return cmd, nil
+}
 
 // TODO better error handling
 func (rr *Reader) parseBulk() (buff []byte, err os.Error) {
@@ -69,7 +93,7 @@ func (rr *Reader) parseBulk() (buff []byte, err os.Error) {
         return nil, newError(err, "bulk parse failed")
     }
 
-    line = strings.TrimRight(line, "\r\n")
+    line = strings.TrimRight(line, LineDelim)
 
     numBytes, err := strconv.Atoi(line)
     if err != nil {
@@ -101,7 +125,7 @@ func (rr *Reader) parseMulti() (cmd *RedisCommand, err os.Error) {
         return nil, newError(err, "error reading first line of multicommand")
     }
 
-    line = strings.TrimRight(line, "\r\n")
+    line = strings.TrimRight(line, LineDelim)
 
     nargs, err := strconv.Atoi(line)
     if err != nil {
@@ -147,7 +171,7 @@ func (rr *Reader) parseSingle() (cmd *RedisCommand, err os.Error) {
     if err != nil || line[len(line)-2] != '\r' {
         return nil, newError(err, "error reading single command")
     }
-    line = bytes.TrimRight(line, "\r\n")
+    line = bytes.TrimRight(line, LineDelim)
 
     cmd.args = bytes.Split(line, []byte{' '}, 0)
 
@@ -171,31 +195,9 @@ func (rr *Reader) parseSingle() (cmd *RedisCommand, err os.Error) {
 }
 
 
-func (rr *Reader) ReadCommand() (cmd *RedisCommand, err os.Error) {
-    firstChar, err := rr.rd.ReadByte()
-
-    if err != nil {
-        return nil, newError(err, "error reading first char from command")
-    }
-
-    if firstChar == '*' {
-        cmd, err = rr.parseMulti()
-        if err != nil {
-            return nil, newError(err, "parseMulti failed")
-        }
-    } else {
-        rr.rd.UnreadByte() // Gotta unread one byte
-        cmd, err = rr.parseSingle()
-        if err != nil {
-            return nil, newError(err, "parseSingle failed")
-        }
-    }
-
-    fmt.Printf("Got command %v!\n", cmd.name)
-    return cmd, nil
-}
-
-
+/*
+ * redisio.writer
+ */
 type Writer struct {
     wr *bufio.Writer
 }
@@ -204,4 +206,43 @@ func NewWriter(wr io.Writer) (rr *Writer) {
     rr = new(Writer)
     rr.wr = bufio.NewWriter(wr)
     return rr
+}
+
+
+func (rr *Writer) Flush() (err os.Error) {
+	return rr.wr.Flush();
+}
+
+
+func (rr *Writer) WriteCommand(cmd *RedisCommand) (err os.Error) {
+	rr.wr.WriteByte('*')
+	nargs := 1 + len(cmd.args) // ARgs  + cmd name
+	_, err = rr.wr.WriteString(strconv.Itoa(nargs))
+	if err != nil { return err }
+
+	_, err = rr.wr.WriteString(LineDelim)
+	if err != nil { return err }
+
+	rr.Flush() //TODO add logic to only flush if there's no data left in buffer
+
+	return nil
+}
+
+func (rr *Writer) writeBulk(arg []byte) (err os.Error) {
+	err = rr.wr.WriteByte('$')
+	if err != nil { return err }
+
+	_, err = rr.wr.WriteString(strconv.Itoa(len(arg)))
+	if err != nil { return err }
+
+	_, err = rr.wr.WriteString(LineDelim)
+	if err != nil { return err }
+
+	_, err = rr.wr.Write(arg)
+	if err != nil { return err }
+
+	_, err = rr.wr.WriteString(LineDelim)
+	if err != nil { return err }
+
+	return nil
 }

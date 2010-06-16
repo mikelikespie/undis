@@ -48,7 +48,19 @@ func main() {
 // proxies from client to server
 func inLoop(inReader *redisio.Reader, outWriter *redisio.Writer) {
     for {
+		command, err := inReader.ReadCommand()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "redis read command failed: %v\n", err)
+			return
+		}
 
+		fmt.Printf("Command: %v\n", command);
+
+		err = outWriter.WriteCommand(command)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "redis write command failed: %v\n", err)
+			return
+		}
     }
 }
 
