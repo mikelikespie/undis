@@ -48,17 +48,6 @@ func (rc *Command) String() string {
         rc.Name, bytes.Join(rc.Args, []byte("', '")))
 }
 
-/*
-* ReplyCodes.  Mapped to the first byte of the reply
- */
-const (
-    replyError      = '-'
-    replySingleLine = '+'
-    replyBulk       = '$'
-    replyMultiBulk  = '*'
-    replyInteger    = ':'
-)
-
 type Reply struct {
     code byte
     vals [][]byte
@@ -92,23 +81,24 @@ func (rr *Reader) ReadReply() (rp *Reply, err os.Error) {
     }
 
     switch rp.code {
-    case replyError:
-    case replySingleLine:
-    case replyInteger:
+    case '-':
+    case '+':
+    case ':':
         ln, err := rr.readLineBytes()
         if err != nil {
             return nil, newError(err, "error reading line bytes")
         }
-        rp.vals = [][]byte{ln}
+		//print(string(ln))
+        rp.vals = [][]byte{ln[1:len(ln)]}
         break
-    case replyBulk:
+    case '$':
         val, err := rr.readBulk()
         if err != nil {
             return nil, newError(err, "read bulk failed")
         }
         rp.vals = [][]byte{val}
         break
-    case replyMultiBulk:
+    case '*':
         rp.vals, err = rr.readMultiVals()
         if err != nil {
             return nil, newError(err, "read multi failed")
@@ -188,7 +178,7 @@ func (rr *Reader) readBulk() (buff []byte, err os.Error) {
 }
 // hasNils is if we're doing a reply, -1's are nils
 func (rr *Reader) readMultiVals() (vals [][]byte, err os.Error) {
-    line, err := rr.rd.ReadString('\n')
+    line, err := rr.readLineString()
     if err != nil {
         return nil, newError(err, "error reading first line of multicommand")
     }
@@ -331,6 +321,36 @@ func (rr *Writer) WriteCommand(cmd *Command) (err os.Error) {
     return nil
 }
 
+func (rr *Writer) WriteReply(rp *Reply) (err os.Error) {
+    switch rp.code {
+    case '*':
+        return rr.writeMultiBulk(rp.vals)
+    case '$':
+        return rr.writeBulk(rp.vals[0])
+    case '+':
+    case '-':
+    case ':':
+        err = rr.wr.WriteByte(rp.code)
+        if err != nil {
+            return err
+        }
+
+        _, err = rr.wr.Write(rp.vals[0])
+        if err != nil {
+            return err
+        }
+
+        _, err = rr.wr.WriteString(LineDelim)
+        if err != nil {
+            return err
+        }
+        break
+    default:
+        return newError(nil, "unknown reply code")
+    }
+    return nil
+}
+
 func (rr *Writer) writeMultiBulk(vals [][]byte) (err os.Error) {
     nargs := len(vals) // ARgs  + cmd name
 
@@ -359,17 +379,25 @@ func (rr *Writer) writeBulk(arg []byte) (err os.Error) {
     if err != nil {
         return err
     }
-    _, err = rr.wr.WriteString(strconv.Itoa(len(arg)))
-    if err != nil {
-        return err
-    }
-    _, err = rr.wr.WriteString(LineDelim)
-    if err != nil {
-        return err
-    }
-    _, err = rr.wr.Write(arg)
-    if err != nil {
-        return err
+
+    if arg == nil {
+        _, err = rr.wr.WriteString("-1")
+        if err != nil {
+            return err
+        }
+    } else {
+        _, err = rr.wr.WriteString(strconv.Itoa(len(arg)))
+        if err != nil {
+            return err
+        }
+        _, err = rr.wr.WriteString(LineDelim)
+        if err != nil {
+            return err
+        }
+        _, err = rr.wr.Write(arg)
+        if err != nil {
+            return err
+        }
     }
     _, err = rr.wr.WriteString(LineDelim)
     if err != nil {

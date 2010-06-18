@@ -46,9 +46,9 @@ func main() {
 
 
 // proxies from client to server
-func inLoop(inReader *redisio.Reader, outWriter *redisio.Writer) {
+func cmdLoop(cmdReader *redisio.Reader, cmdWriter *redisio.Writer) {
     for {
-        command, err := inReader.ReadCommand()
+        command, err := cmdReader.ReadCommand()
         if err != nil {
             fmt.Fprintf(os.Stderr, "redis read command failed: %v\n", err)
             return
@@ -56,16 +56,30 @@ func inLoop(inReader *redisio.Reader, outWriter *redisio.Writer) {
 
         fmt.Printf("Command: %v\n", command)
 
-        err = outWriter.WriteCommand(command)
+        err = cmdWriter.WriteCommand(command)
         if err != nil {
             fmt.Fprintf(os.Stderr, "redis write command failed: %v\n", err)
             return
         }
+		cmdWriter.Flush()
     }
 }
 
-func outLoop(inWriter *redisio.Writer, outReader *redisio.Reader) {
+func replyLoop(replyReader *redisio.Reader, replyWriter *redisio.Writer) {
     for {
+        reply, err := replyReader.ReadReply()
+        if err != nil {
+            fmt.Fprintf(os.Stderr, "redis read reply failed: %v\n", err)
+            return
+        }
+
+        fmt.Printf("Reply: %v\n", reply)
+
+        err = replyWriter.WriteReply(reply)
+        if err != nil {
+            fmt.Fprintf(os.Stderr, "redis write reply failed: %v\n", err)
+            return
+        }
     }
 }
 
@@ -79,11 +93,11 @@ func proxy(in net.Conn, redisAddr string) {
 
     fmt.Printf("Established outgoing connection\n")
 
-    inReader := redisio.NewReader(in)
-    outWriter := redisio.NewWriter(out)
-    go inLoop(inReader, outWriter)
+    cmdReader := redisio.NewReader(in)
+    cmdWriter := redisio.NewWriter(out)
 
-    //	inWriter := bufio.NewWriter(out)
-    //	outReader := bufio.NewReader(in)
-    //	go outLoop(inWriter, outReader)
+	replyReader := redisio.NewReader(out)
+	replyWriter := redisio.NewWriter(in)
+    go replyLoop(replyReader, replyWriter)
+    go cmdLoop(cmdReader, cmdWriter)
 }
