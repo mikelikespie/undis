@@ -61,7 +61,7 @@ func cmdLoop(cmdReader *redisio.Reader, cmdWriter *redisio.Writer) {
             fmt.Fprintf(os.Stderr, "redis write command failed: %v\n", err)
             return
         }
-		cmdWriter.Flush()
+        cmdWriter.Flush()
     }
 }
 
@@ -80,6 +80,7 @@ func replyLoop(replyReader *redisio.Reader, replyWriter *redisio.Writer) {
             fmt.Fprintf(os.Stderr, "redis write reply failed: %v\n", err)
             return
         }
+		replyWriter.Flush()
     }
 }
 
@@ -96,8 +97,8 @@ func proxy(in net.Conn, redisAddr string) {
     cmdReader := redisio.NewReader(in)
     cmdWriter := redisio.NewWriter(out)
 
-	replyReader := redisio.NewReader(out)
-	replyWriter := redisio.NewWriter(in)
+    replyReader := redisio.NewReader(out)
+    replyWriter := redisio.NewWriter(in)
     go replyLoop(replyReader, replyWriter)
     go cmdLoop(cmdReader, cmdWriter)
 }

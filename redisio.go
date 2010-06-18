@@ -81,14 +81,12 @@ func (rr *Reader) ReadReply() (rp *Reply, err os.Error) {
     }
 
     switch rp.code {
-    case '-':
-    case '+':
-    case ':':
+    case '-', '+', ':':
         ln, err := rr.readLineBytes()
         if err != nil {
             return nil, newError(err, "error reading line bytes")
         }
-		//print(string(ln))
+        //print(string(ln))
         rp.vals = [][]byte{ln[1:len(ln)]}
         break
     case '$':
@@ -278,6 +276,7 @@ func (rr *Reader) readLineBytes() (line []byte, err os.Error) {
         return nil, err
     }
     line = bytes.TrimRight(line, LineDelim)
+    fmt.Printf("Got like %s\n", line)
     return line, nil
 }
 
@@ -327,9 +326,7 @@ func (rr *Writer) WriteReply(rp *Reply) (err os.Error) {
         return rr.writeMultiBulk(rp.vals)
     case '$':
         return rr.writeBulk(rp.vals[0])
-    case '+':
-    case '-':
-    case ':':
+    case '+', '-', ':':
         err = rr.wr.WriteByte(rp.code)
         if err != nil {
             return err
