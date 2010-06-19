@@ -75,30 +75,27 @@ func NewReader(rd io.Reader) *Reader {
  */
 func (rr *Reader) ReadReply() (rp *Reply, err os.Error) {
     rp = new(Reply)
-    rp.code, err = rr.peekByte()
-    if err != nil {
+    if rp.code, err = rr.peekByte(); err != nil {
         return nil, err
     }
 
     switch rp.code {
     case '-', '+', ':':
-        ln, err := rr.readLineBytes()
-        if err != nil {
+        if ln, err := rr.readLineBytes(); err != nil {
             return nil, newError(err, "error reading line bytes")
+        } else {
+            rp.vals = [][]byte{ln[1:]}
         }
-        //print(string(ln))
-        rp.vals = [][]byte{ln[1:]}
         break
     case '$':
-        val, err := rr.readBulk()
-        if err != nil {
+        if val, err := rr.readBulk(); err != nil {
             return nil, newError(err, "read bulk failed")
+        } else {
+            rp.vals = [][]byte{val}
         }
-        rp.vals = [][]byte{val}
         break
     case '*':
-        rp.vals, err = rr.readMultiVals()
-        if err != nil {
+        if rp.vals, err = rr.readMultiVals(); err != nil {
             return nil, newError(err, "read multi failed")
         }
         break
@@ -110,27 +107,23 @@ func (rr *Reader) ReadReply() (rp *Reply, err os.Error) {
 }
 
 func (rr *Reader) ReadCommand() (cmd *Command, err os.Error) {
-    firstChar, err := rr.rd.ReadByte()
-    if err != nil {
+    var firstChar byte
+
+    if firstChar, err = rr.rd.ReadByte(); err != nil {
         return nil, newError(err, "error reading first char from command")
     }
 
     // Gotta unread one byte
-    err = rr.rd.UnreadByte()
-    if err != nil {
+    if err = rr.rd.UnreadByte(); err != nil {
         return nil, newError(err, "error unreading byte")
     }
 
     if firstChar == '*' {
-        cmd, err = rr.readMultiCmd()
-        if err != nil {
+        if cmd, err = rr.readMultiCmd(); err != nil {
             return nil, newError(err, "readMulti failed")
         }
-    } else {
-        cmd, err = rr.readSingleCmd()
-        if err != nil {
-            return nil, newError(err, "readSingle failed")
-        }
+    } else if cmd, err = rr.readSingleCmd(); err != nil {
+        return nil, newError(err, "readSingle failed")
     }
 
     fmt.Printf("Got command %v!\n", cmd.Name)
@@ -139,14 +132,13 @@ func (rr *Reader) ReadCommand() (cmd *Command, err os.Error) {
 
 // TODO better error handling
 func (rr *Reader) readBulk() (buff []byte, err os.Error) {
-    // read the expected $
-    b, err := rr.rd.ReadByte()
-    if b != '$' || err != nil {
+    var line string
+
+    if b, err := rr.rd.ReadByte(); b != '$' || err != nil {
         return nil, newError(err, "bulk parse failed")
     }
 
-    line, err := rr.readLineString()
-    if err != nil {
+    if line, err = rr.readLineString(); err != nil {
         return nil, newError(err, "bulk parse failed")
     }
 
@@ -155,12 +147,11 @@ func (rr *Reader) readBulk() (buff []byte, err os.Error) {
         return nil, nil
     }
 
-    numBytes, err := strconv.Atoi(line)
-    if err != nil {
+    if numBytes, err := strconv.Atoi(line); err != nil {
         return nil, newError(err, "bulk parse failed")
+    } else {
+        buff = make([]byte, numBytes)
     }
-
-    buff = make([]byte, numBytes)
 
     nn, err := rr.rd.Read(buff)
 
@@ -176,8 +167,9 @@ func (rr *Reader) readBulk() (buff []byte, err os.Error) {
 }
 // hasNils is if we're doing a reply, -1's are nils
 func (rr *Reader) readMultiVals() (vals [][]byte, err os.Error) {
-    line, err := rr.readLineString()
-    if err != nil {
+    var line string
+
+    if line, err = rr.readLineString(); err != nil {
         return nil, newError(err, "error reading first line of multicommand")
     }
 
@@ -195,8 +187,7 @@ func (rr *Reader) readMultiVals() (vals [][]byte, err os.Error) {
 
     vals = make([][]byte, nargs)
     for i := 0; i < nargs; i++ {
-        vals[i], err = rr.readBulk()
-        if err != nil {
+        if vals[i], err = rr.readBulk(); err != nil {
             return nil, newError(err, "bulk parse failed")
         }
     }
@@ -209,8 +200,7 @@ func (rr *Reader) readMultiCmd() (cmd *Command, err os.Error) {
     print("got multi \n")
 
     cmd = new(Command)
-    cmd.vals, err = rr.readMultiVals()
-    if err != nil {
+    if cmd.vals, err = rr.readMultiVals(); err != nil {
         return nil, newError(err, "failed reading cmd")
     }
 
@@ -221,23 +211,22 @@ func (rr *Reader) readMultiCmd() (cmd *Command, err os.Error) {
 }
 
 func (rr *Reader) readSingleLineVals() (vals [][]byte, err os.Error) {
-    ln, err := rr.readLineBytes()
-    if err != nil {
+    if ln, err := rr.readLineBytes(); err != nil {
         return nil, newError(err, "error reading single line of values")
+    } else {
+        vals = bytes.Split(ln, []byte{' '}, 0)
     }
-    vals = bytes.Split(ln, []byte{' '}, 0)
     return vals, nil
 }
 
 func (rr *Reader) readSingleCmd() (cmd *Command, err os.Error) {
-    vals, err := rr.readSingleLineVals()
-    if err != nil {
+    if vals, err := rr.readSingleLineVals(); err != nil {
         return nil, newError(err, "error reading single command")
+    } else {
+        cmd = new(Command)
+        cmd.Name = bytes.ToLower(vals[0])
+        cmd.Args = vals[1:]
     }
-
-    cmd = new(Command)
-    cmd.Name = bytes.ToLower(vals[0])
-    cmd.Args = vals[1:]
 
     fmt.Printf("got cmd '%s\n'", cmd.Name)
 
@@ -246,15 +235,14 @@ func (rr *Reader) readSingleCmd() (cmd *Command, err os.Error) {
     // if its a bulk cmd, the last arg is the number of bytes of the real last arg
     // So lets swap it out
     if isBulk {
-        nbytes, err := strconv.Atoi(
-            string(cmd.Args[len(cmd.Args)]))
-        if err != nil {
+        if nbytes, err := strconv.Atoi(string(cmd.Args[len(cmd.Args)])); err != nil {
             return nil, newError(err, "parsing bulk argument length failed")
-        }
+        } else {
 
-        bulkbuf := make([]byte, nbytes)
-        rr.rd.Read(bulkbuf)
-        cmd.Args[len(cmd.Args)] = bulkbuf
+            bulkbuf := make([]byte, nbytes)
+            rr.rd.Read(bulkbuf)
+            cmd.Args[len(cmd.Args)] = bulkbuf
+        }
     }
 
     // The line should end with crlf so check the last char is \r
@@ -262,8 +250,7 @@ func (rr *Reader) readSingleCmd() (cmd *Command, err os.Error) {
 }
 
 func (rr *Reader) readLineString() (line string, err os.Error) {
-    line, err = rr.rd.ReadString('\n')
-    if err != nil {
+    if line, err = rr.rd.ReadString('\n'); err != nil {
         return "", err
     }
     line = strings.TrimRight(line, LineDelim)
@@ -271,8 +258,7 @@ func (rr *Reader) readLineString() (line string, err os.Error) {
 }
 
 func (rr *Reader) readLineBytes() (line []byte, err os.Error) {
-    line, err = rr.rd.ReadBytes('\n')
-    if err != nil {
+    if line, err = rr.rd.ReadBytes('\n'); err != nil {
         return nil, err
     }
     line = bytes.TrimRight(line, LineDelim)
@@ -281,12 +267,10 @@ func (rr *Reader) readLineBytes() (line []byte, err os.Error) {
 }
 
 func (rr *Reader) peekByte() (b byte, err os.Error) {
-    b, err = rr.rd.ReadByte()
-    if err != nil {
+    if b, err = rr.rd.ReadByte(); err != nil {
         return b, newError(err, "error parsing first byte of reply")
     }
-    err = rr.rd.UnreadByte()
-    if err != nil {
+    if err = rr.rd.UnreadByte(); err != nil {
         return 0, newError(err, "error unreading byte")
     }
     return b, nil
@@ -327,18 +311,15 @@ func (rr *Writer) WriteReply(rp *Reply) (err os.Error) {
     case '$':
         return rr.writeBulk(rp.vals[0])
     case '+', '-', ':':
-        err = rr.wr.WriteByte(rp.code)
-        if err != nil {
+        if err = rr.wr.WriteByte(rp.code); err != nil {
             return err
         }
 
-        _, err = rr.wr.Write(rp.vals[0])
-        if err != nil {
+        if _, err = rr.wr.Write(rp.vals[0]); err != nil {
             return err
         }
 
-        _, err = rr.wr.WriteString(LineDelim)
-        if err != nil {
+        if _, err = rr.wr.WriteString(LineDelim); err != nil {
             return err
         }
         break
@@ -351,19 +332,16 @@ func (rr *Writer) WriteReply(rp *Reply) (err os.Error) {
 func (rr *Writer) writeMultiBulk(vals [][]byte) (err os.Error) {
     nargs := len(vals) // ARgs  + cmd name
 
-    err = rr.wr.WriteByte('*')
-    if err != nil {
+    if err = rr.wr.WriteByte('*'); err != nil {
         return err
     }
 
-    _, err = rr.wr.WriteString(strconv.Itoa(nargs) + LineDelim)
-    if err != nil {
+    if _, err = rr.wr.WriteString(strconv.Itoa(nargs) + LineDelim); err != nil {
         return err
     }
 
     for _, val := range vals {
-        err = rr.writeBulk(val)
-        if err != nil {
+        if err = rr.writeBulk(val); err != nil {
             return err
         }
     }
@@ -372,32 +350,26 @@ func (rr *Writer) writeMultiBulk(vals [][]byte) (err os.Error) {
 }
 
 func (rr *Writer) writeBulk(arg []byte) (err os.Error) {
-    err = rr.wr.WriteByte('$')
-    if err != nil {
+    if err = rr.wr.WriteByte('$'); err != nil {
         return err
     }
 
     if arg == nil {
-        _, err = rr.wr.WriteString("-1")
-        if err != nil {
+        if _, err = rr.wr.WriteString("-1"); err != nil {
             return err
         }
     } else {
-        _, err = rr.wr.WriteString(strconv.Itoa(len(arg)))
-        if err != nil {
+        if _, err = rr.wr.WriteString(strconv.Itoa(len(arg))); err != nil {
             return err
         }
-        _, err = rr.wr.WriteString(LineDelim)
-        if err != nil {
+        if _, err = rr.wr.WriteString(LineDelim); err != nil {
             return err
         }
-        _, err = rr.wr.Write(arg)
-        if err != nil {
+        if _, err = rr.wr.Write(arg); err != nil {
             return err
         }
     }
-    _, err = rr.wr.WriteString(LineDelim)
-    if err != nil {
+    if _, err = rr.wr.WriteString(LineDelim); err != nil {
         return err
     }
 
