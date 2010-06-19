@@ -16,7 +16,7 @@ REDISIO_FILES=\
 include $(GOROOT)/src/Make.cmd
 
 format:
-	gofmt -spaces=true -tabindent=false -tabwidth=4 -w $(GOFILES) $(REDISIO_FILES)
+	gofmt -r 'α[β:len(α)] -> α[β:]' -spaces=true -tabindent=false -tabwidth=4 -w $(GOFILES) $(REDISIO_FILES)
 
 rdefs:
 	./genrdefs.sh ~/other/redis | gofmt > rdefs.go

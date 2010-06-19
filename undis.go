@@ -80,7 +80,7 @@ func replyLoop(replyReader *redisio.Reader, replyWriter *redisio.Writer) {
             fmt.Fprintf(os.Stderr, "redis write reply failed: %v\n", err)
             return
         }
-		replyWriter.Flush()
+        replyWriter.Flush()
     }
 }
 

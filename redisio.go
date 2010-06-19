@@ -87,7 +87,7 @@ func (rr *Reader) ReadReply() (rp *Reply, err os.Error) {
             return nil, newError(err, "error reading line bytes")
         }
         //print(string(ln))
-        rp.vals = [][]byte{ln[1:len(ln)]}
+        rp.vals = [][]byte{ln[1:]}
         break
     case '$':
         val, err := rr.readBulk()
@@ -185,7 +185,7 @@ func (rr *Reader) readMultiVals() (vals [][]byte, err os.Error) {
         return nil, newError(nil, "expected '*' for bul reply")
     }
 
-    nargs, err := strconv.Atoi(line[1:len(line)])
+    nargs, err := strconv.Atoi(line[1:])
     switch {
     case err != nil:
         return nil, newError(err, "format not expected")
@@ -215,7 +215,7 @@ func (rr *Reader) readMultiCmd() (cmd *Command, err os.Error) {
     }
 
     cmd.Name = cmd.vals[0]
-    cmd.Args = cmd.vals[1:len(cmd.vals)]
+    cmd.Args = cmd.vals[1:]
 
     return cmd, nil
 }
@@ -237,7 +237,7 @@ func (rr *Reader) readSingleCmd() (cmd *Command, err os.Error) {
 
     cmd = new(Command)
     cmd.Name = bytes.ToLower(vals[0])
-    cmd.Args = vals[1:len(vals)]
+    cmd.Args = vals[1:]
 
     fmt.Printf("got cmd '%s\n'", cmd.Name)
 
