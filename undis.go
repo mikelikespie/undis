@@ -5,7 +5,7 @@ import (
     "fmt"
     "net"
     "os"
-    "./redisio"
+    "redisio"
 )
 
 const (
@@ -13,11 +13,10 @@ const (
     defaultRedisAddr  = "localhost:6379"
 )
 
-
 func main() {
     var (
         listener net.Listener
-        err      os.Error
+        err      error
     )
     flag.Parse()
 
@@ -45,7 +44,6 @@ func main() {
         }
     }
 }
-
 
 // proxies from client to server
 func cmdLoop(cmdReader *redisio.Reader, cmdWriter *redisio.Writer) {
@@ -85,7 +83,7 @@ func replyLoop(replyReader *redisio.Reader, replyWriter *redisio.Writer) {
 }
 
 func proxy(in net.Conn, redisAddr string) {
-    if out, err := net.Dial("tcp", "", redisAddr); out == nil {
+    if out, err := net.Dial("tcp", redisAddr); out == nil {
         fmt.Fprintf(os.Stderr, "outgoing connection failed: %v\n", err)
         return
     } else {

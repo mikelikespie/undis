@@ -2,12 +2,11 @@ package redisio
 
 import (
     "bufio"
-    "io"
-    "os"
+    "bytes"
     "fmt"
+    "io"
     "strconv"
     "strings"
-    "bytes"
 )
 
 const (
@@ -15,26 +14,23 @@ const (
     LineDelim = "\r\n"
 )
 
-
 type RedisIOError struct {
-    Msg   string
-    Error os.Error
+    Msg string
+    Err error
 }
 
-func (e *RedisIOError) String() string {
-    if e.Error == nil {
+func (e *RedisIOError) Error() string {
+    if e.Err == nil {
         return "redis protocol error " + e.Msg
     }
 
-    return "redis protocol error caught: " + e.Msg + "\n\t[" + e.Error.String() + "]"
+    return "redis protocol error caught: " + e.Msg + "\n\t[" + e.Err.Error() + "]"
 }
-
 
 // origError can be nil
-func newError(origError os.Error, msgFmt string, a ...interface{}) (err os.Error) {
+func newError(origError error, msgFmt string, a ...interface{}) (err error) {
     return &RedisIOError{fmt.Sprintf(msgFmt, a), origError}
 }
-
 
 /* Args is just a slice of vals, and Name is the first index */
 type Command struct {
@@ -68,12 +64,11 @@ func NewReader(rd io.Reader) *Reader {
     return rr
 }
 
-
 /*
  * Note: When there's an error-type reply (one that starts with '-')
  * we don't throw an error
  */
-func (rr *Reader) ReadReply() (rp *Reply, err os.Error) {
+func (rr *Reader) ReadReply() (rp *Reply, err error) {
     rp = new(Reply)
     if rp.code, err = rr.peekByte(); err != nil {
         return nil, err
@@ -106,7 +101,7 @@ func (rr *Reader) ReadReply() (rp *Reply, err os.Error) {
     return rp, nil
 }
 
-func (rr *Reader) ReadCommand() (cmd *Command, err os.Error) {
+func (rr *Reader) ReadCommand() (cmd *Command, err error) {
     var firstChar byte
 
     if firstChar, err = rr.rd.ReadByte(); err != nil {
@@ -131,7 +126,7 @@ func (rr *Reader) ReadCommand() (cmd *Command, err os.Error) {
 }
 
 // TODO better error handling
-func (rr *Reader) readBulk() (buff []byte, err os.Error) {
+func (rr *Reader) readBulk() (buff []byte, err error) {
     var line string
 
     if b, err := rr.rd.ReadByte(); b != '$' || err != nil {
@@ -165,8 +160,9 @@ func (rr *Reader) readBulk() (buff []byte, err os.Error) {
 
     return buff, nil
 }
+
 // hasNils is if we're doing a reply, -1's are nils
-func (rr *Reader) readMultiVals() (vals [][]byte, err os.Error) {
+func (rr *Reader) readMultiVals() (vals [][]byte, err error) {
     var line string
 
     if line, err = rr.readLineString(); err != nil {
@@ -196,7 +192,7 @@ func (rr *Reader) readMultiVals() (vals [][]byte, err os.Error) {
 }
 
 // Takes the stream after the * has been read
-func (rr *Reader) readMultiCmd() (cmd *Command, err os.Error) {
+func (rr *Reader) readMultiCmd() (cmd *Command, err error) {
     print("got multi \n")
 
     cmd = new(Command)
@@ -210,16 +206,16 @@ func (rr *Reader) readMultiCmd() (cmd *Command, err os.Error) {
     return cmd, nil
 }
 
-func (rr *Reader) readSingleLineVals() (vals [][]byte, err os.Error) {
+func (rr *Reader) readSingleLineVals() (vals [][]byte, err error) {
     if ln, err := rr.readLineBytes(); err != nil {
         return nil, newError(err, "error reading single line of values")
     } else {
-        vals = bytes.Split(ln, []byte{' '}, 0)
+        vals = bytes.SplitN(ln, []byte{' '}, 0)
     }
     return vals, nil
 }
 
-func (rr *Reader) readSingleCmd() (cmd *Command, err os.Error) {
+func (rr *Reader) readSingleCmd() (cmd *Command, err error) {
     if vals, err := rr.readSingleLineVals(); err != nil {
         return nil, newError(err, "error reading single command")
     } else {
@@ -249,7 +245,7 @@ func (rr *Reader) readSingleCmd() (cmd *Command, err os.Error) {
     return cmd, nil
 }
 
-func (rr *Reader) readLineString() (line string, err os.Error) {
+func (rr *Reader) readLineString() (line string, err error) {
     if line, err = rr.rd.ReadString('\n'); err != nil {
         return "", err
     }
@@ -257,7 +253,7 @@ func (rr *Reader) readLineString() (line string, err os.Error) {
     return line, nil
 }
 
-func (rr *Reader) readLineBytes() (line []byte, err os.Error) {
+func (rr *Reader) readLineBytes() (line []byte, err error) {
     if line, err = rr.rd.ReadBytes('\n'); err != nil {
         return nil, err
     }
@@ -266,7 +262,7 @@ func (rr *Reader) readLineBytes() (line []byte, err os.Error) {
     return line, nil
 }
 
-func (rr *Reader) peekByte() (b byte, err os.Error) {
+func (rr *Reader) peekByte() (b byte, err error) {
     if b, err = rr.rd.ReadByte(); err != nil {
         return b, newError(err, "error parsing first byte of reply")
     }
@@ -275,7 +271,6 @@ func (rr *Reader) peekByte() (b byte, err os.Error) {
     }
     return b, nil
 }
-
 
 /*
  * redisio.writer
@@ -290,13 +285,11 @@ func NewWriter(wr io.Writer) (rr *Writer) {
     return rr
 }
 
-
-func (rr *Writer) Flush() (err os.Error) {
+func (rr *Writer) Flush() (err error) {
     return rr.wr.Flush()
 }
 
-
-func (rr *Writer) WriteCommand(cmd *Command) (err os.Error) {
+func (rr *Writer) WriteCommand(cmd *Command) (err error) {
 
     err = rr.writeMultiBulk(cmd.vals)
     rr.Flush() //TODO add logic to only flush if there's no data left in buffer
@@ -304,7 +297,7 @@ func (rr *Writer) WriteCommand(cmd *Command) (err os.Error) {
     return nil
 }
 
-func (rr *Writer) WriteReply(rp *Reply) (err os.Error) {
+func (rr *Writer) WriteReply(rp *Reply) (err error) {
     switch rp.code {
     case '*':
         return rr.writeMultiBulk(rp.vals)
@@ -329,7 +322,7 @@ func (rr *Writer) WriteReply(rp *Reply) (err os.Error) {
     return nil
 }
 
-func (rr *Writer) writeMultiBulk(vals [][]byte) (err os.Error) {
+func (rr *Writer) writeMultiBulk(vals [][]byte) (err error) {
     nargs := len(vals) // ARgs  + cmd name
 
     if err = rr.wr.WriteByte('*'); err != nil {
@@ -349,7 +342,7 @@ func (rr *Writer) writeMultiBulk(vals [][]byte) (err os.Error) {
     return nil
 }
 
-func (rr *Writer) writeBulk(arg []byte) (err os.Error) {
+func (rr *Writer) writeBulk(arg []byte) (err error) {
     if err = rr.wr.WriteByte('$'); err != nil {
         return err
     }
